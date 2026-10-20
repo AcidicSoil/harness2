@@ -55,6 +55,7 @@ https://github.com/user-attachments/assets/76b10548-b14b-4c8f-9aa5-a93662df4d56
 
 - [Video overview](#video-overview)
 - [Harness components](#harness-components)
+- [Add your own extension](#add-your-own-extension)
 - [Install](#install)
 - [Run a benchmark](#run-a-benchmark)
 - [Experiments](#experiments)
@@ -77,6 +78,13 @@ inside the tool loop.
     <img src="assets/components.png" alt="Eight harness components grouped by runtime role: system prompt, guardrails, memory, and skills construct context; tool guidance and scripts define the tool interface; subagents orchestrate delegated work; plugins control middleware." width="100%">
   </a>
 </p>
+
+## Add your own extension
+
+See [Add your own extension](docs/EXTENSIONS.md) to add skills, scripts, or hooks
+to a harness, or to connect a new task suite, agent CLI, or model endpoint. The
+guide includes a local validation example and identifies the Python integration
+points.
 
 ## Install
 

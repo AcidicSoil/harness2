@@ -18,7 +18,7 @@ Pandoc and Poppler are needed by LAB. Also install:
 
 - [Node.js](https://nodejs.org/en/download) 20 or newer.
 - [uv](https://docs.astral.sh/uv/getting-started/installation/).
-- [Google Cloud CLI](https://cloud.google.com/sdk/docs/install).
+- [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) only when using Vertex AI.
 - [Docker Engine](https://docs.docker.com/engine/install/) for WorkBuddy-Bench,
   with permission to run `docker info`.
 
@@ -27,8 +27,7 @@ Keep the main Harness² environment active when running the commands below.
 
 ## Models and credentials
 
-Copy `.env.example` to `.env` if you have not already done so. Set your Vertex AI
-project and model IDs, then authenticate:
+Copy `.env.example` to `.env` if you have not already done so. For no-cost local inference, follow [local model setup](LOCAL_MODELS.md). For Vertex AI, set your cloud project and model IDs, then authenticate:
 
 ```bash
 gcloud auth application-default login
@@ -54,9 +53,8 @@ bridge, still receive the full environment.
 
 The provided configuration uses Vertex Gemini executors and judges, and supports
 either Vertex Claude or Gemini as the improver. LAB also supports the upstream
-judge's direct providers when their credentials are configured. For WorkBuddy,
-setup generates the Gemini solver and judge routes from these settings; rerun
-setup after changing either model.
+judge's direct providers when their credentials are configured. For WorkBuddy, setup generates solver and judge routes for Vertex or a configured local
+OpenAI-compatible endpoint; rerun setup after changing either model or endpoint.
 
 ### Authentication alternatives
 
@@ -139,7 +137,7 @@ WorkBuddy executes Codex inside Docker containers, so the bridge must listen on
 `--host 0.0.0.0`; it also prints `HARNESS2_CODEX_CONTAINER_URL`. This binds the
 bridge to all network interfaces; restrict access to the intended clients.
 
-To use another Responses API endpoint, set `HARNESS2_CODEX_BASE_URL`,
+To use a local or other Responses API endpoint without the Vertex bridge, set `HARNESS2_CODEX_BASE_URL`,
 `HARNESS2_CODEX_API_KEY`, and `HARNESS2_CODEX_MODEL` directly. Setup records the
 endpoint and model in `dependencies/codex/home/config.toml`; rerun setup after
 changing either. `harness2-check` reports stale configuration until then.

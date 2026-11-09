@@ -797,7 +797,10 @@ class JobBenchAdapter:
         render_dir = Path(tempfile.mkdtemp(prefix=f"hrender_{label}_"))
         render_opencode_tree(install.staging_dir, render_dir, _render_ctx(self.domain_of(task_id)))
         env = {
-            **config.scrub_env(keep=config.provider_keys(config.SOLVER_MODEL_OC)),
+            **config.opencode_env(
+                model=config.SOLVER_MODEL_OC,
+                keep=config.provider_keys(config.SOLVER_MODEL_OC),
+            ),
             "TASK_IDS": task_id,
             "LABEL": label,
             "HARNESS_RENDER_DIR": str(render_dir),

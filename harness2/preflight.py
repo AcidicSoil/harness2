@@ -54,6 +54,15 @@ def check(adapter, *, judge=False) -> list[str]:
         except (OSError, RuntimeError, ValueError) as exc:
             errors.append(str(exc))
 
+    local_providers = config.opencode_local_config()
+    if local_providers["provider"]:
+        target = config.OPENCODE_CONFIG_HOME / "opencode" / "opencode.json"
+        try:
+            if json.loads(target.read_text()) != local_providers:
+                errors.append("Local OpenCode model routes are stale; rerun harness2-setup")
+        except (OSError, ValueError):
+            errors.append("Local OpenCode configuration missing; rerun harness2-setup")
+
     bench = adapter.spec.name.split("-", 1)[0]
     name = {"jb": "job-bench-eval", "lab": "harvey-labs", "wb": "workbuddy-bench"}[bench]
     repo = config.DEPENDENCIES / name
@@ -78,7 +87,7 @@ def check(adapter, *, judge=False) -> list[str]:
 
     if any(
         m.startswith("google-vertex") for m in (config.SOLVER_MODEL_OC, config.IMPROVER_MODEL)
-    ) or (judge and (bench == "wb" or config.JUDGE_MODEL.startswith(("claude", "gemini")))):
+    ) or (judge and config.JUDGE_MODEL.startswith(("claude", "gemini"))):
         probe(
             "Google Application Default Credentials",
             ["gcloud", "auth", "application-default", "print-access-token"],
@@ -131,16 +140,13 @@ def check(adapter, *, judge=False) -> list[str]:
             ],
             cwd=repo,
         )
-        for role, expected in (
-            ("solver", config.SOLVER_MODEL_OC.removeprefix("google-vertex/")),
-            ("judge", config.JUDGE_MODEL),
-        ):
+        for role in ("solver", "judge"):
             path = repo / "configs/models/harness2" / f"{role}.yaml"
             try:
-                if json.loads(path.read_text())["model"]["name"] != "google/" + expected:
+                if json.loads(path.read_text()) != config.workbuddy_route(role):
                     errors.append(f"WorkBuddy {role} configuration is stale; rerun setup")
-            except (OSError, ValueError, KeyError, TypeError):
-                errors.append(f"WorkBuddy {role} configuration missing; rerun setup")
+            except (OSError, ValueError, KeyError, TypeError, config.ConfigError):
+                errors.append(f"WorkBuddy {role} configuration missing or invalid; rerun setup")
     return errors
 
 

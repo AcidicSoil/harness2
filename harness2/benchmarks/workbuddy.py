@@ -617,11 +617,12 @@ def run_batch(
         )
 
         timeout_s = timeout_s or int((len(todo) * k / _conc(substrate)) * 3600 * 1.2 + 900)
-        env = {
-            **config.scrub_env(),
-            "NO_FORCE_BUILD": "1",
-            "HARNESS2_WB_VERTEX_URL": config.VERTEX_OPENAI_URL + "/chat/completions",
-        }
+        env = {**config.scrub_env(), "NO_FORCE_BUILD": "1"}
+        if config.SOLVER_MODEL_OC.startswith("google-vertex/"):
+            env["HARNESS2_WB_VERTEX_URL"] = config.VERTEX_OPENAI_URL + "/chat/completions"
+        else:
+            env[config.WB_MODEL_URL_ENV] = config.WB_BASE_URL.rstrip("/") + "/chat/completions"
+            env[config.WB_API_KEY_ENV] = config.WB_API_KEY
         try:
             with _slots[substrate]:
                 _log(f"{label}: {len(todo)} task(s) x k={k} [{substrate}]")

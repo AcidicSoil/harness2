@@ -392,7 +392,7 @@ _JUDGE_KEYS = (
     (("vertex/",), ()),
     (("claude",), ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")),
     (("gemini",), ("GOOGLE_API_KEY", "GEMINI_API_KEY")),
-    (("gpt", "o1", "o3", "o4", "o5"), ("OPENAI_API_KEY",)),
+    (("openai/", "gpt", "o1", "o3", "o4", "o5"), ("OPENAI_API_KEY",)),
 )
 
 
@@ -405,7 +405,7 @@ def _judge_keys(model: str) -> tuple[str, ...]:
 def _lab_env(*, keep: tuple[str, ...] = ()) -> dict[str, str]:
     """LAB subprocess env; `keep` lists the scrubbed credentials the subprocess still needs."""
     return {
-        **config.scrub_env(keep=keep),
+        **config.opencode_env(model=config.SOLVER_MODEL_OC, keep=keep),
         "PYTHONPATH": str(config.lab_repo()),
         "PATH": f"{config.LAB_PYTHON.parent}:{config.BUN.parent}:{config.CODEX_DIST}/codex-path:"
         + os.environ.get("PATH", ""),

@@ -94,7 +94,11 @@ class Proposer:
 
     def env(self) -> dict[str, str]:
         keep = () if self.spec.kind == "claude_cli" else config.provider_keys(self.spec.model)
-        e = config.scrub_env(keep=keep)
+        e = (
+            config.scrub_env(keep=keep)
+            if self.spec.kind == "claude_cli"
+            else config.opencode_env(model=self.spec.model, keep=keep)
+        )
         if self.spec.kind == "claude_cli":
             e.update(
                 {

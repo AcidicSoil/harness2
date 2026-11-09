@@ -129,6 +129,42 @@ def lab_repo() -> Path:
 
 
 OPENCODE_DIR = DEPENDENCIES / "opencode"
+OPENCODE_CONFIG_HOME = DEPENDENCIES / "opencode-config"
+LOCAL_PROVIDER_URLS = {
+    "lmstudio": ("HARNESS2_LMSTUDIO_BASE_URL", "http://127.0.0.1:1234/v1"),
+    "ollama": ("HARNESS2_OLLAMA_BASE_URL", "http://127.0.0.1:11434/v1"),
+    "vllm": ("HARNESS2_VLLM_BASE_URL", "http://127.0.0.1:8000/v1"),
+}
+
+
+def opencode_local_config() -> dict:
+    """Explicit local routes; no implicit cloud fallback."""
+    providers: dict[str, dict] = {}
+    for model in (SOLVER_MODEL_OC, IMPROVER_MODEL):
+        provider, sep, model_id = model.partition("/")
+        if provider not in LOCAL_PROVIDER_URLS:
+            continue
+        if not sep or not model_id:
+            raise ConfigError(f"Invalid local OpenCode model ID: {model!r}")
+        url_name, default_url = LOCAL_PROVIDER_URLS[provider]
+        entry = providers.setdefault(
+            provider,
+            {
+                "npm": "@ai-sdk/openai-compatible",
+                "name": f"Harness2 local {provider}",
+                "options": {"baseURL": env(url_name, default_url)},
+                "models": {},
+            },
+        )
+        entry["models"][model_id] = {
+            "name": model_id,
+            "limit": {
+                "context": env_int("HARNESS2_LOCAL_CONTEXT_LENGTH", 16384),
+                "output": env_int("HARNESS2_LOCAL_OUTPUT_TOKENS", 4096),
+            },
+        }
+    return {"$schema": "https://opencode.ai/config.json", "provider": providers}
+
 BUN = DEPENDENCIES / "tools" / "node_modules" / ".bin" / "bun"
 LAB_PYTHON = lab_repo() / ".venv" / "bin" / "python"
 LAB_JUDGE_MODEL = (
@@ -139,7 +175,7 @@ JB_JUDGE_PYTHON = jb_repo() / ".venv" / "bin" / "python"
 JB_JUDGE_MODEL = (
     "google/" + JUDGE_MODEL
     if JUDGE_MODEL.startswith("gemini") and not env("HARNESS2_JUDGE_BASE_URL")
-    else JUDGE_MODEL
+    else JUDGE_MODEL.removeprefix("openai/")
 )
 _vertex_host = (
     "aiplatform.googleapis.com"
@@ -156,6 +192,7 @@ JB_JUDGE_REASONING_EFFORT = "low"
 JB_REPORTING_JUDGE_DETAILS = ""
 JB_OBS_TRUNC = 50000
 
+BUN_VERSION = "1.3.11"
 CODEX_VERSION = "0.144.6"
 CODEX_DIST = str(DEPENDENCIES / "codex" / "dist")
 CODEX_BASE_URL = env("HARNESS2_CODEX_BASE_URL", "")
@@ -165,6 +202,46 @@ CODEX_HOME_DIR = DEPENDENCIES / "codex" / "home"
 
 WB_SOLVER_MODEL = "harness2/solver"
 WB_WEB_JUDGE = "harness2/judge"
+WB_BASE_URL = env("HARNESS2_WB_BASE_URL", "")
+WB_API_KEY_ENV = "HARNESS2_WB_API_KEY"
+WB_MODEL_URL_ENV = "HARNESS2_WB_MODEL_URL"
+WB_API_KEY = env(WB_API_KEY_ENV, "local")
+
+
+def workbuddy_route(role: str) -> dict:
+    """Generate one benchmark proxy route for Vertex or an OpenAI-compatible server."""
+    if role not in ("solver", "judge"):
+        raise ValueError(f"unknown WorkBuddy model role: {role}")
+    vertex = SOLVER_MODEL_OC.startswith("google-vertex/")
+    if vertex:
+        if not SOLVER_MODEL_OC.startswith("google-vertex/gemini") or not JUDGE_MODEL.startswith("gemini"):
+            raise ConfigError("Vertex WorkBuddy requires a Gemini executor and judge")
+        if not VERTEX_PROJECT:
+            raise ConfigError("Set GOOGLE_CLOUD_PROJECT for WorkBuddy's Vertex routes")
+    elif not WB_BASE_URL:
+        raise ConfigError("Set HARNESS2_WB_BASE_URL for a local WorkBuddy model endpoint")
+
+    model = SOLVER_MODEL_OC.partition("/")[2] if role == "solver" else JUDGE_MODEL.removeprefix("openai/")
+    if not model or (role == "solver" and "/" not in SOLVER_MODEL_OC):
+        raise ConfigError(f"Set a valid WorkBuddy {role} model ID")
+    route = {
+        "name": ("google/" if vertex else "openai/") + model,
+        "protocols": ["openai"],
+        "backend_url_env": "HARNESS2_WB_VERTEX_URL" if vertex else WB_MODEL_URL_ENV,
+    }
+    if vertex:
+        route.update(
+            backend_key_command="gcloud auth application-default print-access-token",
+            backend_key_ttl=1800,
+            thought_signature_passback=True,
+            params={
+                "max_output_tokens": 64000 if role == "solver" else 16384,
+                "extra_body": {"reasoning_effort": "high" if role == "solver" else "low"},
+            },
+        )
+    else:
+        route.update(backend_key_env=WB_API_KEY_ENV, params={"max_output_tokens": 8192})
+    return {"model": route}
 WB_RENDER_PY = sys.executable
 WB_OC_HARNESS_VER = "1.14.18"
 WB_CX_HARNESS_VER = CODEX_VERSION
@@ -193,6 +270,7 @@ def validate_models(*, judge: bool = False) -> None:
 SCRUB_ENV = frozenset(
     {
         "HARNESS2_JUDGE_API_KEY",
+        "HARNESS2_WB_API_KEY",
         "HARNESS2_BRIDGE_KEY",
         "HARNESS2_CODEX_API_KEY",
         "ANTHROPIC_API_KEY",
@@ -245,3 +323,19 @@ _PROVIDER_KEYS = {
 def provider_keys(model: str) -> tuple[str, ...]:
     """The scrubbed credentials an OpenCode `provider/model` needs; () for Vertex and the rest."""
     return _PROVIDER_KEYS.get(model.split("/", 1)[0], ())
+
+
+def opencode_env(
+    base_env: Mapping[str, str] | None = None, *,
+    model: str,
+    keep: Iterable[str] = (),
+) -> dict[str, str]:
+    """Isolate the pinned OpenCode runtime from incompatible global configurations."""
+    result = scrub_env(base_env, keep=keep)
+    if model.split("/", 1)[0] in LOCAL_PROVIDER_URLS:
+        for name in ("OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG_CONTENT"):
+            result.pop(name, None)
+        result["XDG_CONFIG_HOME"] = str(OPENCODE_CONFIG_HOME)
+        # Keep benchmark-owned skills, but exclude hundreds of unrelated global skills.
+        result["OPENCODE_DISABLE_EXTERNAL_SKILLS"] = "1"
+    return result

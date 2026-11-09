@@ -53,14 +53,13 @@ def main(argv=None):
                     raise RuntimeError(f"Missing {binary}; see README.md")
         install.clone("opencode", dry_run=dry)
         install.patch("opencode", dry_run=dry)
-        install.run(
-            ["npm", "install", "--prefix", config.DEPENDENCIES / "tools", "bun@1.3.11"], dry_run=dry
-        )
+        install.ensure_bun(dry_run=dry)
         install.run(
             [config.BUN, "install", "--frozen-lockfile", "--ignore-scripts"],
             cwd=config.OPENCODE_DIR,
             dry_run=dry,
         )
+        install.configure_opencode(dry_run=dry)
         install.clone(name, dry_run=dry)
         install.patch(name, dry_run=dry)
         install.overlays(name, dry_run=dry)

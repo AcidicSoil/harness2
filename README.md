@@ -101,9 +101,9 @@ harness2-demo --output runs/demo --k 2
 The local demo runs both recursion modes with deterministic editors and real
 Python executions. It requires no model credentials.
 
-For model-backed benchmarks, install **Node.js 20+, the Google Cloud CLI**, and
+For model-backed benchmarks, install **Node.js 20+** and
 the [benchmark dependencies](docs/SETUP.md#requirements). LAB needs Pandoc and
-Poppler; WorkBuddy-Bench needs Docker. Then configure your models:
+Poppler; WorkBuddy-Bench needs Docker. Google Cloud CLI is only required for Vertex AI. For self-hosted models without API charges, see [local models](docs/LOCAL_MODELS.md). For Vertex, configure your models:
 
 ```bash
 cp .env.example .env

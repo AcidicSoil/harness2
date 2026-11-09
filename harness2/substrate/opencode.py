@@ -281,7 +281,10 @@ class OpencodeSubstrate:
         for root in extra_allowed:
             allow[str(root)] = "allow"
             allow[f"{root}/**"] = "allow"
-        env = config.scrub_env(base_env, keep=config.provider_keys(model or config.SOLVER_MODEL_OC))
+        selected_model = model or config.SOLVER_MODEL_OC
+        env = config.opencode_env(
+            base_env, model=selected_model, keep=config.provider_keys(selected_model)
+        )
         env["OPENCODE_PERMISSION"] = json.dumps({"external_directory": allow})
         env["OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX"] = str(int(output_token_max))
         return env

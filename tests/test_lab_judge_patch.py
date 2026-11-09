@@ -94,7 +94,7 @@ class LabJudgePatchTests(unittest.TestCase):
             "BENCH_ROOT": self.root,
             "RESULTS_DIR": self.root / "results",
         }
-        load_nodes(upstream / "evaluation/judge.py", {"Judge"}, self.scope)
+        load_nodes(upstream / "evaluation/judge.py", {"Judge", "_detect_provider"}, self.scope)
         load_nodes(
             upstream / "evaluation/scoring.py",
             {
@@ -162,6 +162,13 @@ class LabJudgePatchTests(unittest.TestCase):
         cached = judge_one(LabAdapter(), "contracts/task-1", "agg", 1, "agg1", "run-1", self.run)
         self.assertEqual(cached.all_pass, scores["all_pass"])
         return scores, cached, transport
+
+    def test_explicit_openai_provider_routes_local_model_without_renaming(self):
+        self.assertEqual(self.scope["_detect_provider"]("openai/qwen3.5-9b-mtp"), "openai")
+        self.scope["openai"] = SimpleNamespace(OpenAI=lambda: object())
+        judge = self.scope["Judge"]("openai/qwen3.5-9b-mtp")
+        self.assertEqual(judge.provider, "openai")
+        self.assertEqual(judge.model, "qwen3.5-9b-mtp")
 
     def test_conflicting_fenced_verdicts_retry_before_writing_a_score(self):
         response = 'Format:\n```json\n{"verdict":"pass","reasoning":"example"}\n```\nAnswer:\n```json\n{"verdict":"fail","reasoning":"actual verdict"}\n```'

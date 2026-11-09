@@ -66,6 +66,26 @@ def run(cmd, *, cwd=None, dry_run=False):
         subprocess.run(cmd, cwd=cwd, check=True)
 
 
+def ensure_bun(*, dry_run=False):
+    """Install pinned Bun; recover if npm's script policy blocked its executable."""
+    root = config.DEPENDENCIES / "tools"
+    run(["npm", "install", "--prefix", root, f"bun@{config.BUN_VERSION}"], dry_run=dry_run)
+    def installed() -> bool:
+        try:
+            result = subprocess.run(
+                [str(config.BUN), "--version"],
+                capture_output=True, text=True, timeout=15,
+            )
+            return result.returncode == 0 and result.stdout.strip() == config.BUN_VERSION
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+
+    if dry_run or not installed():
+        run(["node", root / "node_modules/bun/install.js"], cwd=root, dry_run=dry_run)
+    if not dry_run and not installed():
+        raise RuntimeError(f"Bundled Bun must be version {config.BUN_VERSION}")
+
+
 def clone(name: str, *, dry_run=False):
     repo = config.DEPENDENCIES / name
     pin = config.DEPENDENCY_PINS[name]
@@ -148,45 +168,32 @@ def overlays(name: str, *, dry_run=False):
             )
 
 
-def workbuddy_models(*, dry_run=False):
-    """Generate the two Vertex routes from the user's model IDs, never credentials."""
-    solver = config.SOLVER_MODEL_OC.removeprefix("google-vertex/")
-    judge = config.JUDGE_MODEL
-    problem = ""
-    if not config.SOLVER_MODEL_OC.startswith("google-vertex/gemini") or not judge.startswith(
-        "gemini"
-    ):
-        problem = (
-            "WorkBuddy setup requires a google-vertex/gemini... executor "
-            "and a gemini... judge; choose IDs available in your project"
-        )
-    elif not config.VERTEX_PROJECT:
-        problem = "Set GOOGLE_CLOUD_PROJECT for WorkBuddy's Vertex routes"
-    if problem:
-        if not dry_run:
-            raise config.ConfigError(problem)
-        print(f"Configure WorkBuddy solver and judge routes -- {problem}", flush=True)
+def configure_opencode(*, dry_run=False):
+    """Write isolated local provider configuration for the pinned OpenCode runtime."""
+    contents = config.opencode_local_config()
+    if not contents["provider"]:
         return
-    for role, model in (("solver", solver), ("judge", judge)):
-        payload = {
-            "model": {
-                "name": "google/" + model,
-                "protocols": ["openai"],
-                "backend_url_env": "HARNESS2_WB_VERTEX_URL",
-                "backend_key_command": "gcloud auth application-default print-access-token",
-                "backend_key_ttl": 1800,
-                "thought_signature_passback": True,
-                "params": {
-                    "max_output_tokens": 64000 if role == "solver" else 16384,
-                    "extra_body": {"reasoning_effort": "high" if role == "solver" else "low"},
-                },
-            }
-        }
+    target = config.OPENCODE_CONFIG_HOME / "opencode" / "opencode.json"
+    print(f"Configure local OpenCode models: {target}", flush=True)
+    if not dry_run:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(contents, indent=2) + "\n", encoding="utf-8")
+
+
+def workbuddy_models(*, dry_run=False):
+    """Write benchmark proxy routes without embedding provider credentials."""
+    try:
+        routes = {role: config.workbuddy_route(role) for role in ("solver", "judge")}
+    except config.ConfigError as exc:
+        if not dry_run:
+            raise
+        print(f"Configure WorkBuddy solver and judge routes -- {exc}", flush=True)
+        return
+    for role, payload in routes.items():
         path = config.wb_repo() / "configs" / "models" / "harness2" / f"{role}.yaml"
-        print(f"Configure WorkBuddy {role}: {model}", flush=True)
+        print(f"Configure WorkBuddy {role}: {payload['model']['name']}", flush=True)
         if not dry_run:
             path.parent.mkdir(parents=True, exist_ok=True)
-
             path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 

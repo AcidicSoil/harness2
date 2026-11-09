@@ -103,11 +103,11 @@ solver and judge routes from `.env`, downloads the requested subset with the
 upstream fetch script, and builds the OpenCode harness image. The public Vertex
 setup uses a `google-vertex/gemini...` executor and a bare `gemini...` judge ID;
 no model YAML or account-specific proxy configuration needs to be copied from
-another checkout. Setup refuses to run unless `HARNESS2_SOLVER_MODEL` is a
-`google-vertex/gemini...` ID and `HARNESS2_JUDGE_MODEL` a bare `gemini...` one,
-with `GOOGLE_CLOUD_PROJECT` set; `--dry-run` reports the requirement and still
-prints the rest of the plan. The benchmark's job-local proxy refreshes ADC tokens
-and preserves Gemini tool-call thought signatures.
+another checkout. For self-hosted inference, use an OpenCode-compatible executor model, an explicit
+`openai/<model-id>` judge, and `HARNESS2_WB_BASE_URL` pointing at a reachable
+OpenAI-compatible server. The original Vertex route still refreshes ADC tokens
+and preserves Gemini tool-call thought signatures. See [local models](LOCAL_MODELS.md)
+for Docker connectivity and endpoint configuration.
 
 Setup patches the upstream fetch script to download with `curl` (then `wget`,
 then `hf`) and to require the dataset repository's `SHA256SUMS`: an archive that

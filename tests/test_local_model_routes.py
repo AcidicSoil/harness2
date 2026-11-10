@@ -115,5 +115,55 @@ class WorkBuddyLocalRoutesTests(unittest.TestCase):
         )
 
 
+class WorkBuddyImagePreflightTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        for slug in ("opencode", "oc-harness"):
+            path = self.root / f"configs/harnesses/{slug}/versions/{config.WB_OC_HARNESS_VER}.yaml"
+            path.parent.mkdir(parents=True)
+            path.write_text("name: test\n")
+        script = self.root / "scripts/run.sh"
+        script.parent.mkdir(parents=True)
+        script.write_text("#!/bin/sh\n")
+
+    def test_missing_image_blocks_ready_state(self):
+        from unittest.mock import Mock
+
+        from harness2.benchmarks.workbuddy import WbAdapter
+        from harness2.substrate.opencode import OpencodeSubstrate
+
+        with (
+            patch.object(config, "wb_repo", return_value=self.root),
+            patch("harness2.benchmarks.workbuddy.shutil.which", return_value="/usr/bin/uv"),
+            patch.object(OpencodeSubstrate, "preflight"),
+            patch(
+                "harness2.benchmarks.workbuddy.subprocess.run",
+                return_value=Mock(returncode=1),
+            ) as command,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Docker image"):
+                WbAdapter("code", substrate="oc").preflight()
+        self.assertIn("image", command.call_args.args[0])
+
+    def test_existing_image_passes_preflight(self):
+        from unittest.mock import Mock
+
+        from harness2.benchmarks.workbuddy import WbAdapter
+        from harness2.substrate.opencode import OpencodeSubstrate
+
+        with (
+            patch.object(config, "wb_repo", return_value=self.root),
+            patch("harness2.benchmarks.workbuddy.shutil.which", return_value="/usr/bin/uv"),
+            patch.object(OpencodeSubstrate, "preflight"),
+            patch(
+                "harness2.benchmarks.workbuddy.subprocess.run",
+                return_value=Mock(returncode=0),
+            ),
+        ):
+            WbAdapter("code", substrate="oc").preflight()
+
+
 if __name__ == "__main__":
     unittest.main()

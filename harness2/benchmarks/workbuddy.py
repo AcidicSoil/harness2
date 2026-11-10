@@ -963,6 +963,18 @@ class WbAdapter:
             self.substrate.preflight(require_dist=True, require_bridge=True)
         else:
             self.substrate.preflight()
+            image = f"workbuddy-bench/harness/opencode:{config.WB_OC_HARNESS_VER}"
+            result = subprocess.run(
+                ["docker", "image", "inspect", image],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            if result.returncode:
+                raise RuntimeError(
+                    f"WorkBuddy Docker image {image} missing; rerun "
+                    f"harness2-setup wb --subset {self.subset} when disk space is available"
+                )
 
     def _killed(self, run_dir: Path) -> bool:
         """True when the capture stream ends on a provider error object, i.e. the rollout was

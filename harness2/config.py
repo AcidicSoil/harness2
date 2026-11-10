@@ -165,6 +165,7 @@ def opencode_local_config() -> dict:
         }
     return {"$schema": "https://opencode.ai/config.json", "provider": providers}
 
+
 BUN = DEPENDENCIES / "tools" / "node_modules" / ".bin" / "bun"
 LAB_PYTHON = lab_repo() / ".venv" / "bin" / "python"
 LAB_JUDGE_MODEL = (
@@ -214,14 +215,20 @@ def workbuddy_route(role: str) -> dict:
         raise ValueError(f"unknown WorkBuddy model role: {role}")
     vertex = SOLVER_MODEL_OC.startswith("google-vertex/")
     if vertex:
-        if not SOLVER_MODEL_OC.startswith("google-vertex/gemini") or not JUDGE_MODEL.startswith("gemini"):
+        if not SOLVER_MODEL_OC.startswith("google-vertex/gemini") or not JUDGE_MODEL.startswith(
+            "gemini"
+        ):
             raise ConfigError("Vertex WorkBuddy requires a Gemini executor and judge")
         if not VERTEX_PROJECT:
             raise ConfigError("Set GOOGLE_CLOUD_PROJECT for WorkBuddy's Vertex routes")
     elif not WB_BASE_URL:
         raise ConfigError("Set HARNESS2_WB_BASE_URL for a local WorkBuddy model endpoint")
 
-    model = SOLVER_MODEL_OC.partition("/")[2] if role == "solver" else JUDGE_MODEL.removeprefix("openai/")
+    model = (
+        SOLVER_MODEL_OC.partition("/")[2]
+        if role == "solver"
+        else JUDGE_MODEL.removeprefix("openai/")
+    )
     if not model or (role == "solver" and "/" not in SOLVER_MODEL_OC):
         raise ConfigError(f"Set a valid WorkBuddy {role} model ID")
     route = {
@@ -242,6 +249,8 @@ def workbuddy_route(role: str) -> dict:
     else:
         route.update(backend_key_env=WB_API_KEY_ENV, params={"max_output_tokens": 8192})
     return {"model": route}
+
+
 WB_RENDER_PY = sys.executable
 WB_OC_HARNESS_VER = "1.14.18"
 WB_CX_HARNESS_VER = CODEX_VERSION
@@ -326,7 +335,8 @@ def provider_keys(model: str) -> tuple[str, ...]:
 
 
 def opencode_env(
-    base_env: Mapping[str, str] | None = None, *,
+    base_env: Mapping[str, str] | None = None,
+    *,
     model: str,
     keep: Iterable[str] = (),
 ) -> dict[str, str]:

@@ -70,11 +70,14 @@ def ensure_bun(*, dry_run=False):
     """Install pinned Bun; recover if npm's script policy blocked its executable."""
     root = config.DEPENDENCIES / "tools"
     run(["npm", "install", "--prefix", root, f"bun@{config.BUN_VERSION}"], dry_run=dry_run)
+
     def installed() -> bool:
         try:
             result = subprocess.run(
                 [str(config.BUN), "--version"],
-                capture_output=True, text=True, timeout=15,
+                capture_output=True,
+                text=True,
+                timeout=15,
             )
             return result.returncode == 0 and result.stdout.strip() == config.BUN_VERSION
         except (OSError, subprocess.TimeoutExpired):

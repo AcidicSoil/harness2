@@ -21,12 +21,14 @@ class WorkBuddyLocalRoutesTests(unittest.TestCase):
             ):
                 install.workbuddy_models()
                 models = [
-                    json.loads((Path(directory) / f"configs/models/harness2/{role}.yaml").read_text())["model"]
+                    json.loads(
+                        (Path(directory) / f"configs/models/harness2/{role}.yaml").read_text()
+                    )["model"]
                     for role in ("solver", "judge")
                 ]
-        self.assertEqual([model["name"] for model in models], [
-            "openai/qwen3.5-9b-mtp", "openai/qwen3.5-9b-mtp"
-        ])
+        self.assertEqual(
+            [model["name"] for model in models], ["openai/qwen3.5-9b-mtp", "openai/qwen3.5-9b-mtp"]
+        )
         for model in models:
             self.assertEqual(model["backend_url_env"], "HARNESS2_WB_MODEL_URL")
             self.assertNotIn("backend_key_command", model)
@@ -42,8 +44,12 @@ class WorkBuddyLocalRoutesTests(unittest.TestCase):
                 install.workbuddy_models()
 
     def test_local_opencode_routes_are_isolated_from_global_config(self):
-        with patch.object(config, "OPENCODE_CONFIG_HOME", Path("/tmp/harness2-config"), create=True):
-            generated = config.opencode_env({"XDG_CONFIG_HOME": "/home/shared", "PATH": "/bin"}, model="lmstudio/qwen3.5-9b-mtp")
+        with patch.object(
+            config, "OPENCODE_CONFIG_HOME", Path("/tmp/harness2-config"), create=True
+        ):
+            generated = config.opencode_env(
+                {"XDG_CONFIG_HOME": "/home/shared", "PATH": "/bin"}, model="lmstudio/qwen3.5-9b-mtp"
+            )
         self.assertEqual(generated["XDG_CONFIG_HOME"], "/tmp/harness2-config")
         self.assertEqual(generated["PATH"], "/bin")
         self.assertEqual(generated["OPENCODE_DISABLE_EXTERNAL_SKILLS"], "1")
@@ -77,7 +83,10 @@ class WorkBuddyLocalRoutesTests(unittest.TestCase):
 
         with (
             patch.object(install, "run") as runner,
-            patch("harness2.install.subprocess.run", return_value=Mock(returncode=0, stdout="1.3.11\n")),
+            patch(
+                "harness2.install.subprocess.run",
+                return_value=Mock(returncode=0, stdout="1.3.11\n"),
+            ),
         ):
             install.ensure_bun()
         self.assertEqual(runner.call_count, 1)
@@ -87,19 +96,23 @@ class WorkBuddyLocalRoutesTests(unittest.TestCase):
 
         with (
             patch.object(install, "run") as runner,
-            patch("harness2.install.subprocess.run", side_effect=[
-                Mock(returncode=126, stdout=""),
-                Mock(returncode=0, stdout="1.3.11\n"),
-            ]),
+            patch(
+                "harness2.install.subprocess.run",
+                side_effect=[
+                    Mock(returncode=126, stdout=""),
+                    Mock(returncode=0, stdout="1.3.11\n"),
+                ],
+            ),
         ):
             install.ensure_bun()
         self.assertEqual(runner.call_count, 2)
         self.assertEqual(runner.call_args.kwargs["cwd"], config.DEPENDENCIES / "tools")
 
     def test_workbuddy_auth_key_is_scrubbed_from_agents(self):
-        self.assertNotIn("HARNESS2_WB_API_KEY", config.scrub_env({
-            "HARNESS2_WB_API_KEY": "secret", "PATH": "/usr/bin"
-        }))
+        self.assertNotIn(
+            "HARNESS2_WB_API_KEY",
+            config.scrub_env({"HARNESS2_WB_API_KEY": "secret", "PATH": "/usr/bin"}),
+        )
 
 
 if __name__ == "__main__":
